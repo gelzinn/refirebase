@@ -13,7 +13,7 @@ import {
 
 import { MESSAGES } from "../config/messages";
 
-export class RealtimeDatabase {
+export class RealtimeDatabase<TSchema extends Record<string, any> = any> {
   db: FirebaseDatabase;
 
   constructor(app: FirebaseApp) {
@@ -30,22 +30,27 @@ export class RealtimeDatabase {
    * @param path - The path to the data in the database.
    * @returns The data at the specified path or null if the data does not exist.
    */
-  async get(path: string): Promise<unknown | { error: unknown }> {
+  async get<K extends Extract<keyof TSchema, string>, T = TSchema[K]>(
+    path: K | string
+  ): Promise<T | null | { error: unknown }> {
     try {
       const snapshot = await get(ref(this.db, path));
-      return snapshot.exists() ? snapshot.val() : null;
+      return snapshot.exists() ? (snapshot.val() as T) : null;
     } catch (error) {
       return { error };
     }
   }
 
-  async onValue(path: string, callback: (data: unknown) => void) {
+  async onValue<K extends Extract<keyof TSchema, string>, T = TSchema[K]>(
+    path: K | string,
+    callback: (data: T | null) => void
+  ) {
     const dbRef = ref(this.db, path);
     const snapshot = await get(dbRef);
-    callback(snapshot.val());
+    callback(snapshot.val() as T);
 
     return onValue(dbRef, (snapshot) => {
-      callback(snapshot.val());
+      callback(snapshot.val() as T);
     });
   }
 
@@ -57,9 +62,9 @@ export class RealtimeDatabase {
    *
    * @returns An error object if the operation fails.
    */
-  async set(
-    path: string,
-    data: unknown
+  async set<K extends Extract<keyof TSchema, string>, T = TSchema[K]>(
+    path: K | string,
+    data: T
   ): Promise<undefined | { error: unknown }> {
     try {
       await set(ref(this.db, path), data);
@@ -76,12 +81,12 @@ export class RealtimeDatabase {
    *
    * @returns An error object if the operation fails.
    */
-  async update(
-    path: string,
-    data: object
+  async update<K extends Extract<keyof TSchema, string>, T = TSchema[K]>(
+    path: K | string,
+    data: Partial<T>
   ): Promise<undefined | { error: unknown }> {
     try {
-      await update(ref(this.db, path), data);
+      await update(ref(this.db, path), data as object);
     } catch (error) {
       return { error };
     }
@@ -93,7 +98,9 @@ export class RealtimeDatabase {
    * @param path - The path to the data in the database.
    * @returns An error object if the operation fails.
    */
-  async delete(path: string): Promise<undefined | { error: unknown }> {
+  async delete<K extends Extract<keyof TSchema, string>>(
+    path: K | string
+  ): Promise<undefined | { error: unknown }> {
     try {
       await remove(ref(this.db, path));
     } catch (error) {

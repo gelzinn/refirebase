@@ -13,7 +13,8 @@
     "module": "commonjs",
     "declaration": true,
     "outDir": "dist",
-    "strict": true
+    "strict": true,
+    "jsx": "react-jsx"
   },
   "include": [
     "src"

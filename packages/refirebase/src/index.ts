@@ -18,13 +18,13 @@ declare global {
   }
 }
 
-export class Refirebase {
+export class Refirebase<TSchema extends Record<string, any> = any> {
   private readonly internalConfig: FirebaseConfig;
   private readonly app: FirebaseApp;
 
   public readonly db: {
-    firestore: FirestoreDatabase;
-    realtime: RealtimeDatabase;
+    firestore: FirestoreDatabase<TSchema>;
+    realtime: RealtimeDatabase<TSchema>;
     storage: StorageFirebase;
   };
 
@@ -63,6 +63,7 @@ export class Refirebase {
       messagingSenderId: getEnv("FIREBASE_MESSAGING_SENDER_ID"),
       appId: getEnv("FIREBASE_APP_ID"),
       measurementId: getEnv("FIREBASE_MEASUREMENT_ID"),
+      useEmulators: getEnv("FIREBASE_USE_EMULATORS") === "true",
     };
 
     /**
@@ -100,15 +101,38 @@ export class Refirebase {
     this.app = init(this.internalConfig);
 
     this.db = {
-      firestore: new FirestoreDatabase(this.app),
-      realtime: new RealtimeDatabase(this.app),
+      firestore: new FirestoreDatabase<TSchema>(this.app),
+      realtime: new RealtimeDatabase<TSchema>(this.app),
       storage: new StorageFirebase(this.app),
     };
 
     this.auth = new FirebaseAuth(this.app);
     this.analytics = new FirebaseAnalytics(this.app);
+
+    if (this.internalConfig.useEmulators) {
+      this.setupEmulators();
+    }
+  }
+
+  private setupEmulators() {
+    const { connectFirestoreEmulator, getFirestore } = require("firebase/firestore");
+    const { connectAuthEmulator, getAuth } = require("firebase/auth");
+    const { connectDatabaseEmulator, getDatabase } = require("firebase/database");
+    const { connectStorageEmulator, getStorage } = require("firebase/storage");
+
+    try {
+      connectFirestoreEmulator(getFirestore(this.app), "localhost", 8080);
+      connectAuthEmulator(getAuth(this.app), "http://localhost:9099");
+      connectDatabaseEmulator(getDatabase(this.app), "localhost", 9000);
+      connectStorageEmulator(getStorage(this.app), "localhost", 9199);
+      console.log("🔥 [Refirebase] Connected to Firebase Emulators");
+    } catch (error) {
+      console.warn("⚠️ [Refirebase] Failed to connect to emulators:", error);
+    }
   }
 }
+
+export * from "./react";
 
 export type {
   FirebaseConfig as RefirebaseConfig,

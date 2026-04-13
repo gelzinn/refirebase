@@ -7,4 +7,5 @@ export type FirebaseConfig = {
   messagingSenderId: string;
   appId: string;
   measurementId?: string;
+  useEmulators?: boolean;
 };
