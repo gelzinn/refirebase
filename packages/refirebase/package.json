@@ -1,0 +1,127 @@
+{
+  "name": "refirebase",
+  "version": "0.2.0",
+  "description": "🔥 New easiest Firebase API",
+  "author": "gelzin.com",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "react-native": "./dist/native/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/**"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "exports": {
+    ".": {
+      "react-native": {
+        "types": "./dist/native/index.d.ts",
+        "default": "./dist/native/index.js"
+      },
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "browser": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "node": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "default": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./react": {
+      "react-native": {
+        "types": "./dist/native/react-native.d.ts",
+        "default": "./dist/native/react-native.js"
+      },
+      "import": {
+        "types": "./dist/react/index.d.ts",
+        "default": "./dist/react/index.js"
+      },
+      "require": {
+        "types": "./dist/react/index.d.ts",
+        "default": "./dist/react/index.js"
+      },
+      "default": {
+        "types": "./dist/react/index.d.ts",
+        "default": "./dist/react/index.js"
+      }
+    },
+    "./admin": {
+      "import": {
+        "types": "./dist/admin/index.d.ts",
+        "default": "./dist/admin/index.js"
+      },
+      "require": {
+        "types": "./dist/admin/index.d.ts",
+        "default": "./dist/admin/index.js"
+      },
+      "node": {
+        "types": "./dist/admin/index.d.ts",
+        "default": "./dist/admin/index.js"
+      },
+      "default": {
+        "types": "./dist/admin/index.d.ts",
+        "default": "./dist/admin/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "dev": "bun run src/index.ts --watch",
+    "build": "bun build src/index.ts src/react/index.tsx src/admin/index.ts src/native/index.ts src/native/react-native.tsx --outdir=dist --sourcemap --external react --external react-dom --external firebase --external firebase/app --external firebase/firestore --external firebase/auth --external firebase/database --external firebase/storage --external firebase/analytics --external firebase-admin --external firebase-admin/app --external firebase-admin/auth --external firebase-admin/firestore --external firebase-admin/storage --external firebase-admin/database && tsc --emitDeclarationOnly --declaration --outDir dist",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test": "bun test src",
+    "prepublishOnly": "bun run build"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/refirebase/refirebase.git"
+  },
+  "keywords": [
+    "refirebase",
+    "firebase",
+    "typescript",
+    "javascript"
+  ],
+  "devDependencies": {
+    "@types/node": "18.19.44",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "firebase-admin": "^13.6.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "typescript": "5.5.4"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18",
+    "firebase-admin": ">=12"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "firebase-admin": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "firebase": "^10.13.1"
+  }
+}

@@ -1,179 +1,215 @@
-<p align="center">
-  <a href="https://github.com/refirebase">
-    <img src="https://avatars.githubusercontent.com/u/181779808?v=4" alt="Refirebase Logo" width="128" style="border-radius: 8px">
-    <h1 align="center">
-      Refirebase
-    </h1>
-  </a>
-</p>
+# Refirebase
 
-<p align="center">
-  <a href="https://www.npmjs.com/refirebase">
-    <img src="https://img.shields.io/npm/v/refirebase.svg">
-  </a>
-  <a href="https://github.com/refirebase/refirebase?tab=MIT-1-ov-file">
-    <img src="https://img.shields.io/npm/l/refirebase.svg">
-  </a>
-</p>
+[![npm version](https://img.shields.io/npm/v/refirebase.svg)](https://www.npmjs.com/package/refirebase)
+[![License](https://img.shields.io/npm/l/refirebase.svg)](https://github.com/gelzinn/refirebase/blob/main/LICENSE)
 
-Refirebase is a simple library that allows you to use Firebase Realtime Database, Firestore, Storage and Authentication as a state management solution in your JavaScript application.
+Refirebase is a typed, unified API for Firebase Authentication, Firestore, Realtime Database, Storage, Analytics, React, React Native/Expo, and the Firebase Admin SDK.
+
+This README documents the `0.2.0` release. Full API documentation and an interactive playground are available at [refirebase.gelzin.com](https://refirebase.gelzin.com) (or run the website locally from `apps/website`).
 
 ## Installation
 
-Use your favorite package manager to install Refirebase:
-
-### NPM
-
 ```bash
 npm install refirebase
+# or: yarn add refirebase
+# or: pnpm add refirebase
+# or: bun add refirebase
 ```
 
-### Yarn, PNPM, BUN
+Refirebase includes the Firebase JavaScript SDK as a dependency. Install `firebase-admin` only when using the server-side Admin SDK:
 
 ```bash
-yarn add refirebase
+npm install firebase-admin
 ```
 
-```bash
-pnpm add refirebase
-```
+## Quick start
 
-```bash
-bun add refirebase
-```
+Create one shared instance. The constructor reads `FIREBASE_*` environment variables automatically, or you can pass a configuration object.
 
-## Usage
-
-Import the `Refirebase` class:
-
-```javascript
+```ts
 import { Refirebase } from 'refirebase';
-```
 
-You can use the `Refirebase` class to get the Firebase objects:
-
-```javascript
-const refirebase = new Refirebase({
-  apiKey: 'FIREBASE_API_KEY',
-  authDomain: 'FIREBASE_AUTH_DOMAIN',
-  databaseURL: 'FIREBASE_DATABASE_URL',
-  projectId: 'FIREBASE_PROJECT_ID',
-  storageBucket: 'FIREBASE_STORAGE_BUCKET',
-  messagingSenderId: 'FIREBASE_MESSAGING_SENDER_ID',
-  appId: 'FIREBASE_APP_ID',
-  measurementId: 'FIREBASE_MEASUREMENT_ID',
-});
-```
-
-Or you can use destructuring to get other objects:
-
-```javascript
-const { db, auth } = new Refirebase({
-  apiKey: 'FIREBASE_API_KEY',
-  authDomain: 'FIREBASE_AUTH_DOMAIN',
-  databaseURL: 'FIREBASE_DATABASE_URL',
-  projectId: 'FIREBASE_PROJECT_ID',
-  storageBucket: 'FIREBASE_STORAGE_BUCKET',
-  messagingSenderId: 'FIREBASE_MESSAGING_SENDER_ID',
-  appId: 'FIREBASE_APP_ID',
-  measurementId: 'FIREBASE_MEASUREMENT_ID',
-});
-```
-
-If you prefer to use directly environment variables (from `.env` file), you can simply call the constructor without any parameters:
-
-```yaml
-FIREBASE_API_KEY=
-FIREBASE_AUTH_DOMAIN=
-FIREBASE_DATABASE_URL=
-FIREBASE_PROJECT_ID=
-FIREBASE_STORAGE_BUCKET=
-FIREBASE_MESSAGING_SENDER_ID=
-FIREBASE_APP_ID=
-FIREBASE_MEASUREMENT_ID=
-```
-
-```javascript
-const refirebase = new Refirebase();
-```
-
-## Examples
-
-### Databases
-
-#### Firestore Database Example
-```javascript
-// Import the Refirebase class
-import { db } from '@/config/firebase';
-
-// Get all data from the 'users' collection
-const users = db.firestore.get("users");
-
-// Get data with conditions
-const users = db.firestore.get("users", {
-  where: {
-    name: "John",
-  },
+export const firebase = new Refirebase({
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  databaseURL: process.env.FIREBASE_DATABASE_URL,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID,
 });
 
-// Get data with conditions and index
-const users = db.firestore.get("users", {
-  where: {
-    name: "John",
-    lastName: { not: "Doe" },
-  },
+const { db, auth } = firebase;
+```
+
+The required configuration keys are `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, and `appId`. `databaseURL`, `measurementId`, and `useEmulators` are optional.
+
+In Next.js client code, use the corresponding `NEXT_PUBLIC_FIREBASE_*` variables. Refirebase falls back to those names when the unprefixed variables are unavailable.
+
+## Firebase APIs
+
+### Firestore
+
+```ts
+const users = await db.firestore.get('users', {
+  where: { role: 'admin' },
+  orderBy: [{ field: 'created_at', direction: 'desc' }],
+  limit: 20,
 });
 
-// Get data with conditions and not
-const users = db.firestore.get("users", {
-  where: {
-    name: "John",
-    age: { operator: ">=", value: 18 },
-  },
+const created = await db.firestore.add('users', {
+  name: 'Alice',
+  role: 'admin',
 });
+
+const stop = db.firestore.subscribe('users', (documents) => {
+  console.log('Users updated:', documents);
+});
+
+await db.firestore.update('users', 'user-123', { active: true });
+stop();
 ```
 
-> [!WARNING]  
-> For more information about the limitations of the Firestore query, see [Firebase Firestore Query Limitations](https://firebase.google.com/docs/firestore/query-data/queries#query_limitations).
+The Firestore API also includes `set`, `delete`, `getGroup`, `count`, `aggregate`, `runTransaction`, and `batch`.
 
-#### Realtime Database Example
+### Realtime Database
 
-```javascript
-// Import the Refirebase class
-import { db } from '@/config/firebase';
+```ts
+const value = await db.realtime.get('settings');
+await db.realtime.set('presence/user-123', true);
 
-// Get ALL data from the 'users' collection
-const users = db.realtime.get("users");
+const stop = await db.realtime.onValue('inbox/user-123', (inbox) => {
+  console.log(inbox);
+});
+
+const pushed = await db.realtime.push('messages', { text: 'Hello!' });
+stop();
 ```
 
-#### Storage
+### Storage
 
-```javascript
-// Import the Refirebase class
-import { db } from '@/config/firebase';
+```ts
+const uploaded = await db.storage.upload('media/photo.jpg', file, {
+  downloadUrl: true,
+});
 
-// Get a file from the storage
-const file = db.storage.get("path/to/file");
+const { task, promise } = db.storage.uploadWithProgress(
+  'videos/clip.mp4',
+  file,
+  { onProgress: (progress) => console.log(`${progress}%`) },
+);
+
+const result = await promise;
+const bytes = await db.storage.getBytes(uploaded.path);
+const url = await db.storage.getUrl(uploaded.path);
 ```
 
-### Features
+Storage also provides `getBlob`, `update`, and `delete`.
 
-#### Authentication Example
+### Authentication
 
-```javascript
-// Import the Refirebase class
-import { auth } from '@/config/firebase';
+Authentication methods return typed `{ data, error }` results instead of throwing Firebase errors.
 
-// Sign in with Google
-const result = await auth.handleProviderSignIn("google");
+```ts
+const { data, error } = await auth.handleEmailSignIn(
+  'alice@example.com',
+  'password123',
+);
 
-if (!result) {
-  // Handle error
+await auth.handleEmailSignUp('alice@example.com', 'password123', {
+  displayName: 'Alice',
+});
+
+await auth.updateProfile({ displayName: 'Alice Smith' });
+await auth.handleEmailVerification();
+await auth.handleSignOut();
+```
+
+Available methods include provider sign-in, email sign-in/sign-up, password reset, email verification, profile updates, account deletion, provider linking, sign-out, and access-token retrieval.
+
+## React
+
+Import the provider and hooks from `refirebase/react`:
+
+```tsx
+import { RefirebaseProvider, useAuth, useCollection } from 'refirebase/react';
+import { firebase } from './firebase';
+
+export function App() {
+  return (
+    <RefirebaseProvider instance={firebase}>
+      <UserList />
+    </RefirebaseProvider>
+  );
 }
 
-const user = result.user;
+function UserList() {
+  const { user, signInWithGoogle } = useAuth();
+  const { data, loading } = useCollection('users');
+
+  if (!user) return <button onClick={signInWithGoogle}>Sign in</button>;
+  if (loading) return <p>Loading...</p>;
+  return <ul>{data.map((user) => <li key={user.id}>{user.name}</li>)}</ul>;
+}
 ```
+
+Additional hooks include `useRefirebase`, `useUser`, `useDocument`, `useValue`, `usePagination`, `useUploadTask`, and `usePresence`.
+
+## React Native / Expo
+
+Use the native entry point and convert device URIs to Blobs before uploading:
+
+```ts
+import { RefirebaseNative, uriToBlob } from 'refirebase/native';
+
+export const firebase = new RefirebaseNative();
+const blob = await uriToBlob(imageUri);
+await firebase.db.storage.upload('avatars/me.jpg', blob);
+```
+
+`NativeFirebaseAuth` uses native credentials instead of browser popups. The package also exposes the same `refirebase` and `refirebase/react` imports through the React Native export condition.
+
+## Admin SDK
+
+Use `refirebase/admin` only in server-side code:
+
+```ts
+import { RefirebaseAdmin } from 'refirebase/admin';
+
+const admin = new RefirebaseAdmin();
+const token = await admin.auth.createCustomToken(userId);
+await admin.db.firestore.update('users', userId, { verified: true });
+const signedUrl = await admin.db.storage.getSignedUrl('private/report.pdf');
+```
+
+Configure the Admin SDK with `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`, or pass them to the constructor. `firebase-admin` is an optional peer dependency.
+
+## Error handling
+
+Use `isRefirebaseError` to narrow operation results and access the normalized `code`, `message`, and `originalError` fields:
+
+```ts
+import { isRefirebaseError } from 'refirebase';
+
+const result = await db.firestore.get('users');
+if (isRefirebaseError(result)) {
+  console.error(result.error.code, result.error.message);
+}
+```
+
+## Development
+
+This repository is a Bun/Turborepo monorepo:
+
+```bash
+bun install
+bun run build
+bun test packages/refirebase
+bun run dev
+```
+
+The published npm package contains only `packages/refirebase/package.json` and its generated `dist` files. The website and playground are repository applications and are not included in the package tarball.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT. See [LICENSE](LICENSE).

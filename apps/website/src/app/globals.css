@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+@utility scroll-fade-x {
+  --scroll-fade-distance: 64px;
+  --scroll-fade-band: 16px;
+}
+
+.scroll-fade-x[data-scroll="start"] {
+  mask-image:
+    linear-gradient(to right, black, black calc(100% - var(--scroll-fade-distance)), transparent),
+    linear-gradient(black, black);
+  mask-size: 100% calc(100% - var(--scroll-fade-band)), 100% var(--scroll-fade-band);
+  mask-position: top, bottom;
+  mask-repeat: no-repeat;
+}
+
+.scroll-fade-x[data-scroll="end"] {
+  mask-image:
+    linear-gradient(to right, transparent, black var(--scroll-fade-distance), black),
+    linear-gradient(black, black);
+  mask-size: 100% calc(100% - var(--scroll-fade-band)), 100% var(--scroll-fade-band);
+  mask-position: top, bottom;
+  mask-repeat: no-repeat;
+}
+
+.scroll-fade-x[data-scroll="middle"] {
+  mask-image:
+    linear-gradient(to right, transparent, black var(--scroll-fade-distance), black calc(100% - var(--scroll-fade-distance)), transparent),
+    linear-gradient(black, black);
+  mask-size: 100% calc(100% - var(--scroll-fade-band)), 100% var(--scroll-fade-band);
+  mask-position: top, bottom;
+  mask-repeat: no-repeat;
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --border: oklch(0.922 0 0);
+  --card: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --primary: oklch(0.145 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --accent: oklch(0.7 0.17 45);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --muted: oklch(0.205 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --border: oklch(0.269 0 0);
+    --card: oklch(0.185 0 0);
+    --secondary: oklch(0.205 0 0);
+    --primary: oklch(0.985 0 0);
+    --primary-foreground: oklch(0.145 0 0);
+    --accent: oklch(0.75 0.16 50);
+  }
+}
+
+@theme {
+  --animate-icon-in: icon-in 300ms cubic-bezier(0.2, 0, 0, 1);
+  --animate-fade-up: fade-up 500ms cubic-bezier(0.2, 0, 0, 1) backwards;
+  --animate-page-in: page-in 350ms cubic-bezier(0.2, 0, 0, 1);
+
+  @keyframes icon-in {
+    from {
+      opacity: 0;
+      scale: 0.25;
+      filter: blur(4px);
+    }
+  }
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      translate: 0 12px;
+      filter: blur(4px);
+    }
+  }
+  @keyframes page-in {
+    from {
+      opacity: 0;
+      translate: 0 8px;
+    }
+  }
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading;
+  }
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-heading: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-secondary: var(--secondary);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+}
+
+body {
+  @apply bg-background font-sans text-foreground antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: rgba(150, 150, 150, 0.3);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(150, 150, 150, 0.5);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}

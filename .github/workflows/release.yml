@@ -30,14 +30,15 @@ jobs:
       - name: Check existing version
         run: |
           existing_version=$(npm show refirebase version)
-          target_version=$(jq -r '.version' package.json)
+          target_version=$(jq -r '.version' packages/refirebase/package.json)
           if [ "$existing_version" == "$target_version" ]; then
-            echo "Version $target_version already exists. Please update the version in package.json."
+            echo "Version $target_version already exists. Please update the version in packages/refirebase/package.json."
             exit 1
           fi
 
       - name: Build and Publish package
         run: |
+          cd packages/refirebase
           if ! bun run build; then
             echo "Error: Failed to build the package."
             exit 1
@@ -45,15 +46,10 @@ jobs:
 
           # Login to NPM
           echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
-          npm login --registry=https://registry.npmjs.org/ --auth-type=legacy
-
+          
           # Then publish with force flag
-          if ! npm publish --access public --force; then
+          if ! npm publish --access public; then
             echo "Error: Failed to publish the package."
-            echo "Possible reasons:"
-            echo "- You might be trying to publish an already existing version."
-            echo "- Check your permissions for the npm registry."
-            echo "- Ensure your package.json is correctly configured."
             exit 1
           fi
 
