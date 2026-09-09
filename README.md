@@ -5,7 +5,7 @@
 
 Refirebase is a typed, unified API for Firebase Authentication, Firestore, Realtime Database, Storage, Analytics, React, React Native/Expo, and the Firebase Admin SDK.
 
-This README documents the `0.2.0` release. Full API documentation and an interactive playground are available at [refirebase.dev](https://refirebase.dev) (or run the website locally from `apps/website`).
+This README documents the `0.2.0` release. Full API documentation and an interactive playground are available at [refirebase.gelzin.com](https://refirebase.gelzin.com) (or run the website locally from `apps/website`).
 
 ## Installation
 
