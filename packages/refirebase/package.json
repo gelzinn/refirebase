@@ -2,6 +2,7 @@
   "name": "refirebase",
   "version": "0.2.0",
   "description": "🔥 New easiest Firebase API",
+  "homepage": "https://refirebase.gelzin.com",
   "author": "gelzin.com",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
