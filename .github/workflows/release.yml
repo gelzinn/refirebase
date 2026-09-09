@@ -37,17 +37,13 @@ jobs:
           fi
 
       - name: Build and Publish package
+        working-directory: packages/refirebase
         run: |
-          cd packages/refirebase
           if ! bun run build; then
             echo "Error: Failed to build the package."
             exit 1
           fi
 
-          # Login to NPM
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
-          
-          # Then publish with force flag
           if ! npm publish --access public; then
             echo "Error: Failed to publish the package."
             exit 1
@@ -55,4 +51,4 @@ jobs:
 
           echo "Package published successfully. Version: $(jq -r '.version' package.json)"
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
