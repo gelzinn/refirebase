@@ -1,23 +1,50 @@
-import type { FirebaseApp } from "firebase/app";
+import type { FirebaseApp } from 'firebase/app';
 
 import {
   type Auth,
-  EmailAuthProvider,
   FacebookAuthProvider,
   GithubAuthProvider,
   GoogleAuthProvider,
   TwitterAuthProvider,
   type User,
   type UserCredential,
+  createUserWithEmailAndPassword,
+  deleteUser,
   getAuth,
+  linkWithPopup,
   onAuthStateChanged,
   onIdTokenChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signInWithCustomToken,
+  signInWithEmailAndPassword,
   signInWithPopup,
-} from "firebase/auth";
+  signOut,
+  updateProfile,
+} from 'firebase/auth';
 
-import { MESSAGES } from "../config/messages";
+import { MESSAGES } from '../config/messages';
+import { toRefirebaseError } from '../types/firebase/error';
+import type { UpdateProfileOptions } from '../types/firebase/auth';
 
-type Provider = "google" | "github" | "twitter" | "facebook";
+type Provider = 'google' | 'github' | 'twitter' | 'facebook';
+
+function buildProvider(
+  provider: Provider,
+): GoogleAuthProvider | GithubAuthProvider | TwitterAuthProvider | FacebookAuthProvider {
+  switch (provider) {
+    case 'google':
+      return new GoogleAuthProvider();
+    case 'github':
+      return new GithubAuthProvider();
+    case 'twitter':
+      return new TwitterAuthProvider();
+    case 'facebook':
+      return new FacebookAuthProvider();
+    default:
+      throw new Error(MESSAGES.AUTH.INVALID_PROVIDER(provider));
+  }
+}
 
 export class FirebaseAuth {
   private readonly auth: Auth;
@@ -26,72 +53,28 @@ export class FirebaseAuth {
     if (!app) {
       throw new Error(MESSAGES.FIREBASE.APP_NOT_INITIALIZED);
     }
-
     this.auth = getAuth(app);
   }
 
   /**
-   * Sign in with a third-party provider.
-   *
-   * @param provider The provider to sign in with.
-   * @param options The options for signing in with the provider.
-   *
-   * @returns A promise that resolves with `data` if the sign-in is successful, or an error if the sign-in fails.
+   * Sign in with a third-party provider (Google, GitHub, Twitter, Facebook).
+   * Uses a popup flow — for React Native use `refirebase/native`.
    */
   async handleProviderSignIn(
     provider: Provider,
-    options?: { scopes?: string[] }
+    options?: { scopes?: string[] },
   ): Promise<{
     data: UserCredential | null;
-    error?: any;
+    error?: ReturnType<typeof toRefirebaseError>;
   }> {
-    let authProvider:
-      | GoogleAuthProvider
-      | GithubAuthProvider
-      | TwitterAuthProvider
-      | FacebookAuthProvider
-      | null = null;
+    const authProvider = buildProvider(provider);
 
-    switch (provider) {
-      case "google":
-        authProvider = new GoogleAuthProvider();
-        break;
-      case "github":
-        authProvider = new GithubAuthProvider();
-        break;
-      case "twitter":
-        authProvider = new TwitterAuthProvider();
-        break;
-      case "facebook":
-        authProvider = new FacebookAuthProvider();
-        break;
-      default:
-        throw new Error(MESSAGES.AUTH.INVALID_PROVIDER(provider));
-    }
-
-    const validProviders = [
-      GoogleAuthProvider,
-      GithubAuthProvider,
-      TwitterAuthProvider,
-      FacebookAuthProvider,
-    ];
-
-    if (
-      !authProvider ||
-      !validProviders.some((provider) => authProvider instanceof provider)
-    ) {
-      throw new Error(MESSAGES.AUTH.INVALID_PROVIDER(provider));
-    }
-
-    if (options) {
-      if (options.scopes) {
-        const { scopes } = options;
-
-        for (const scope of scopes) {
-          if (typeof scope !== "string") {
-            throw new Error(MESSAGES.AUTH.INVALID_SCOPE(scope));
-          }
+    if (options?.scopes) {
+      for (const scope of options.scopes) {
+        if (typeof scope !== 'string') {
+          throw new Error(MESSAGES.AUTH.INVALID_SCOPE(scope));
         }
+        (authProvider as GoogleAuthProvider).addScope(scope);
       }
     }
 
@@ -99,73 +82,231 @@ export class FirebaseAuth {
       const data = await signInWithPopup(this.auth, authProvider);
       return { data };
     } catch (error) {
-      console.error(MESSAGES.AUTH.SIGNIN_FAILED(provider), error);
+      return { data: null, error: toRefirebaseError(error) };
+    }
+  }
 
-      return {
-        data: null,
-        error,
-      };
+  /**
+   * Sign in with a Firebase custom token (e.g. minted after Better Auth).
+   */
+  async handleCustomTokenSignIn(token: string): Promise<{
+    data: UserCredential | null;
+    error?: ReturnType<typeof toRefirebaseError>;
+  }> {
+    try {
+      const data = await signInWithCustomToken(this.auth, token);
+      return { data };
+    } catch (error) {
+      return { data: null, error: toRefirebaseError(error) };
     }
   }
 
   /**
    * Sign in with an email and password.
-   *
-   * @param email The user's email address.
-   * @param password The user's password.
-   *
-   * @returns A promise that resolves with the user credential or null if the sign-in fails.
    */
   async handleEmailSignIn(
     email: string,
-    password: string
-  ): Promise<UserCredential | null> {
+    password: string,
+  ): Promise<{
+    data: UserCredential | null;
+    error?: ReturnType<typeof toRefirebaseError>;
+  }> {
     try {
-      return await signInWithPopup(
-        this.auth,
-        EmailAuthProvider.credential(email, password)
-      );
+      const data = await signInWithEmailAndPassword(this.auth, email, password);
+      return { data };
     } catch (error) {
-      console.error(MESSAGES.AUTH.SIGNIN_FAILED("email"), error);
-      return null;
+      return { data: null, error: toRefirebaseError(error) };
+    }
+  }
+
+  /**
+   * Create a new account with email and password.
+   * Optionally updates display name and photo URL right after creation.
+   */
+  async handleEmailSignUp(
+    email: string,
+    password: string,
+    options?: { displayName?: string; photoURL?: string },
+  ): Promise<{
+    data: UserCredential | null;
+    error?: ReturnType<typeof toRefirebaseError>;
+  }> {
+    try {
+      const credential = await createUserWithEmailAndPassword(
+        this.auth,
+        email,
+        password,
+      );
+      if (options?.displayName || options?.photoURL) {
+        await updateProfile(credential.user, {
+          displayName: options.displayName,
+          photoURL: options.photoURL,
+        });
+      }
+      return { data: credential };
+    } catch (error) {
+      return { data: null, error: toRefirebaseError(error) };
+    }
+  }
+
+  /**
+   * Send a password reset email to the given address.
+   */
+  async handlePasswordReset(email: string): Promise<{
+    error?: ReturnType<typeof toRefirebaseError>;
+  }> {
+    try {
+      await sendPasswordResetEmail(this.auth, email);
+      return {};
+    } catch (error) {
+      return { error: toRefirebaseError(error) };
+    }
+  }
+
+  /**
+   * Send an email verification to the currently signed-in user.
+   */
+  async handleEmailVerification(): Promise<{
+    error?: ReturnType<typeof toRefirebaseError>;
+  }> {
+    const user = this.auth.currentUser;
+    if (!user) {
+      return {
+        error: {
+          code: 'unauthenticated',
+          message: 'No user is currently signed in.',
+        },
+      };
+    }
+    try {
+      await sendEmailVerification(user);
+      return {};
+    } catch (error) {
+      return { error: toRefirebaseError(error) };
+    }
+  }
+
+  /**
+   * Update the current user's display name and/or photo URL.
+   */
+  async updateProfile(options: UpdateProfileOptions): Promise<{
+    error?: ReturnType<typeof toRefirebaseError>;
+  }> {
+    const user = this.auth.currentUser;
+    if (!user) {
+      return {
+        error: {
+          code: 'unauthenticated',
+          message: 'No user is currently signed in.',
+        },
+      };
+    }
+    try {
+      await updateProfile(user, options);
+      return {};
+    } catch (error) {
+      return { error: toRefirebaseError(error) };
+    }
+  }
+
+  /**
+   * Permanently delete the current user's account.
+   * Note: Recent sign-in may be required. Re-authenticate if you get a credential error.
+   */
+  async deleteAccount(): Promise<{
+    error?: ReturnType<typeof toRefirebaseError>;
+  }> {
+    const user = this.auth.currentUser;
+    if (!user) {
+      return {
+        error: {
+          code: 'unauthenticated',
+          message: 'No user is currently signed in.',
+        },
+      };
+    }
+    try {
+      await deleteUser(user);
+      return {};
+    } catch (error) {
+      return { error: toRefirebaseError(error) };
+    }
+  }
+
+  /**
+   * Link the current account with an additional third-party provider.
+   * Allows a user to sign in with multiple providers.
+   */
+  async linkProvider(provider: Provider): Promise<{
+    data: UserCredential | null;
+    error?: ReturnType<typeof toRefirebaseError>;
+  }> {
+    const user = this.auth.currentUser;
+    if (!user) {
+      return {
+        data: null,
+        error: {
+          code: 'unauthenticated',
+          message: 'No user is currently signed in.',
+        },
+      };
+    }
+    try {
+      const data = await linkWithPopup(user, buildProvider(provider));
+      return { data };
+    } catch (error) {
+      return { data: null, error: toRefirebaseError(error) };
     }
   }
 
   /**
    * Sign out the current user.
-   * @returns A promise that resolves when the user is signed out.
    */
-  handleSignOut(): void {
-    this.auth.signOut();
+  async handleSignOut(): Promise<{
+    error?: ReturnType<typeof toRefirebaseError>;
+  }> {
+    try {
+      await signOut(this.auth);
+      return {};
+    } catch (error) {
+      return { error: toRefirebaseError(error) };
+    }
   }
 
   /**
-   * Get the current user.
-   * @returns The current user or null if the user is not signed in.
+   * Get the current user synchronously.
+   * @returns The current user or null if not signed in.
    */
   getCurrentUser(): User | null {
     return this.auth.currentUser;
   }
 
   /**
-   * Get the current user's access token.
-   * @returns The user's access token or null if the user is not signed in.
+   * Get the current user's Firebase ID token.
+   * @param forceRefresh Force token refresh (useful before API calls).
    */
-  getAccessToken(): Promise<string | null> {
-    return this.auth.currentUser?.getIdToken() ?? Promise.resolve(null);
+  getAccessToken(forceRefresh = false): Promise<string | null> {
+    return (
+      this.auth.currentUser?.getIdToken(forceRefresh) ?? Promise.resolve(null)
+    );
+  }
+
+  /**
+   * Underlying Auth instance (escape hatch).
+   */
+  get native(): Auth {
+    return this.auth;
   }
 
   /**
    * Listen for changes to the user's sign-in state.
-   * @param callback A function that takes the current user as an argument.
    */
   onAuthStateChanged(callback: (user: User | null) => void): () => void {
     return onAuthStateChanged(this.auth, callback);
   }
 
   /**
-   * Listen for changes to the user's ID token.
-   * @param callback A function that takes the current user as an argument.
+   * Listen for changes to the user's ID token (including automatic token refresh).
    */
   onIdTokenChanged(callback: (user: User | null) => void): () => void {
     return onIdTokenChanged(this.auth, callback);

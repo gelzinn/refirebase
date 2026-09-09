@@ -1,22 +1,22 @@
-import type { FirebaseApp } from "firebase/app";
+import type { FirebaseApp } from 'firebase/app';
 
-import { init } from "./firebase";
+import { init } from './firebase';
 
-import { FirebaseAnalytics } from "./firebase/analytics";
-import { FirestoreDatabase } from "./firebase/firestore";
-import { RealtimeDatabase } from "./firebase/realtime";
-import { StorageFirebase } from "./firebase/storage";
-import { FirebaseAuth } from "./firebase/auth";
+import { FirebaseAnalytics } from './firebase/analytics';
+import { FirebaseAuth } from './firebase/auth';
+import { FirestoreDatabase } from './firebase/firestore';
+import { RealtimeDatabase } from './firebase/realtime';
+import { StorageFirebase } from './firebase/storage';
 
-import { FirebaseConfig } from "./types/firebase/config";
-import { WhereCondition } from "./types/firebase/firestore";
+import type { FirebaseConfig } from './types/firebase/config';
+import type { WhereCondition } from './types/firebase/firestore';
+import { getEnv, getEnvFlag } from './utils/env';
+import { logger } from './utils/logger';
 
-// Adding type declaration for window.__FIREBASE_CONFIG__
-declare global {
-  interface Window {
-    __FIREBASE_CONFIG__?: Record<string, string>;
-  }
-}
+import { connectAuthEmulator, getAuth } from 'firebase/auth';
+import { connectDatabaseEmulator, getDatabase } from 'firebase/database';
+import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
+import { connectStorageEmulator, getStorage } from 'firebase/storage';
 
 export class Refirebase<TSchema extends Record<string, any> = any> {
   private readonly internalConfig: FirebaseConfig;
@@ -32,38 +32,16 @@ export class Refirebase<TSchema extends Record<string, any> = any> {
   public readonly analytics: FirebaseAnalytics;
 
   constructor(firebaseConfig?: Partial<FirebaseConfig>) {
-    /**
-     * Get environment variable
-     *
-     * @param key - The environment variable key
-     * @returns The environment variable value or undefined if not found
-     */
-    const getEnv = (key: string): string | undefined => {
-      // In Node.js, try to use process.env
-      if (typeof process !== "undefined" && process.env) {
-        return process.env[key];
-      }
-
-      // In browser, try to use window.__FIREBASE_CONFIG__
-      if (typeof window !== "undefined" && window.__FIREBASE_CONFIG__) {
-        return window.__FIREBASE_CONFIG__[key];
-      }
-      return undefined;
-    };
-
-    /**
-     * Try to get values from environment variables first
-     */
     const envConfig: Partial<FirebaseConfig> = {
-      apiKey: getEnv("FIREBASE_API_KEY"),
-      authDomain: getEnv("FIREBASE_AUTH_DOMAIN"),
-      databaseURL: getEnv("FIREBASE_DATABASE_URL"),
-      projectId: getEnv("FIREBASE_PROJECT_ID"),
-      storageBucket: getEnv("FIREBASE_STORAGE_BUCKET"),
-      messagingSenderId: getEnv("FIREBASE_MESSAGING_SENDER_ID"),
-      appId: getEnv("FIREBASE_APP_ID"),
-      measurementId: getEnv("FIREBASE_MEASUREMENT_ID"),
-      useEmulators: getEnv("FIREBASE_USE_EMULATORS") === "true",
+      apiKey: getEnv('FIREBASE_API_KEY'),
+      authDomain: getEnv('FIREBASE_AUTH_DOMAIN'),
+      databaseURL: getEnv('FIREBASE_DATABASE_URL'),
+      projectId: getEnv('FIREBASE_PROJECT_ID'),
+      storageBucket: getEnv('FIREBASE_STORAGE_BUCKET'),
+      messagingSenderId: getEnv('FIREBASE_MESSAGING_SENDER_ID'),
+      appId: getEnv('FIREBASE_APP_ID'),
+      measurementId: getEnv('FIREBASE_MEASUREMENT_ID'),
+      useEmulators: getEnvFlag('FIREBASE_USE_EMULATORS'),
     };
 
     /**
@@ -87,13 +65,13 @@ export class Refirebase<TSchema extends Record<string, any> = any> {
       !config.appId
     ) {
       const missingValues = Object.keys(config).filter(
-        (key) => !config[key as keyof FirebaseConfig]
+        (key) => !config[key as keyof FirebaseConfig],
       );
 
       throw new Error(
         `Missing Firebase keys: ${missingValues.join(
-          ", "
-        )}. Please provide all required keys either through environment variables or the config object.`
+          ', ',
+        )}. Please provide all required keys either through environment variables or the config object.`,
       );
     }
 
@@ -115,24 +93,17 @@ export class Refirebase<TSchema extends Record<string, any> = any> {
   }
 
   private setupEmulators() {
-    const { connectFirestoreEmulator, getFirestore } = require("firebase/firestore");
-    const { connectAuthEmulator, getAuth } = require("firebase/auth");
-    const { connectDatabaseEmulator, getDatabase } = require("firebase/database");
-    const { connectStorageEmulator, getStorage } = require("firebase/storage");
-
     try {
-      connectFirestoreEmulator(getFirestore(this.app), "localhost", 8080);
-      connectAuthEmulator(getAuth(this.app), "http://localhost:9099");
-      connectDatabaseEmulator(getDatabase(this.app), "localhost", 9000);
-      connectStorageEmulator(getStorage(this.app), "localhost", 9199);
-      console.log("🔥 [Refirebase] Connected to Firebase Emulators");
+      connectFirestoreEmulator(getFirestore(this.app), 'localhost', 8080);
+      connectAuthEmulator(getAuth(this.app), 'http://localhost:9099');
+      connectDatabaseEmulator(getDatabase(this.app), 'localhost', 9000);
+      connectStorageEmulator(getStorage(this.app), 'localhost', 9199);
+      logger.info('Connected to Firebase Emulators');
     } catch (error) {
-      console.warn("⚠️ [Refirebase] Failed to connect to emulators:", error);
+      logger.warn('Failed to connect to emulators:', error);
     }
   }
 }
-
-export * from "./react";
 
 export type {
   FirebaseConfig as RefirebaseConfig,
@@ -144,3 +115,28 @@ export type {
   FirebaseAnalytics as RefirebaseAnalytics,
   WhereCondition as RefirebaseWhereCondition,
 };
+
+export type {
+  StorageUploadOptions,
+  StorageUploadResult,
+  UploadTaskState,
+} from './types/firebase/storage';
+
+export type {
+  RefirebaseError,
+} from './types/firebase/error';
+
+export {
+  isRefirebaseError,
+  toRefirebaseError,
+  ERROR_MESSAGES,
+} from './types/firebase/error';
+
+export type {
+  UpdateProfileOptions,
+} from './types/firebase/auth';
+
+export {
+  FirestoreTransaction,
+  FirestoreWriteBatch,
+} from './firebase/firestore';

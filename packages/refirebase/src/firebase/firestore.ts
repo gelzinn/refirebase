@@ -1,35 +1,129 @@
-import type { FirebaseApp } from "firebase/app";
+import type { FirebaseApp } from 'firebase/app';
 
 import {
+  type AggregateSpec,
   type Firestore as FirebaseFirestore,
-  CollectionReference,
-  Query,
-  WhereFilterOp,
-  collection,
+  type Query,
+  type Transaction,
+  type WriteBatch,
+  average,
+  collectionGroup,
+  count,
   deleteDoc,
   doc,
+  getAggregateFromServer,
   getDoc,
   getDocs,
   getFirestore,
+  limit,
+  onSnapshot,
+  orderBy,
   query,
+  runTransaction,
   setDoc,
+  startAfter,
+  sum,
   updateDoc,
   where,
-  orderBy,
-  limit,
-  startAfter,
-  onSnapshot,
-} from "firebase/firestore";
+  writeBatch,
+} from 'firebase/firestore';
 
-import {
+import { MESSAGES } from '../config/messages';
+import type {
+  FirestoreError,
   GetByCondition,
   GetById,
   ReturnGenericObj,
-  FirestoreError,
-  WhereCondition,
-} from "../types/firebase/firestore";
+} from '../types/firebase/firestore';
+import { whereClauses } from '../utils/where';
+import { collectionRef, documentRef } from './refs';
 
-import { MESSAGES } from "../config/messages";
+function withTimestamps<T>(
+  data: T,
+  created: boolean,
+): T & {
+  created_at?: string;
+  updated_at: string;
+} {
+  const timestamp = new Date().toISOString();
+  const object =
+    typeof data === 'object' && data !== null ? data : ({ value: data } as T);
+
+  return created
+    ? { ...object, created_at: timestamp, updated_at: timestamp }
+    : { ...object, updated_at: timestamp };
+}
+
+export class FirestoreTransaction {
+  constructor(
+    private readonly tx: Transaction,
+    private readonly db: FirebaseFirestore,
+  ) {}
+
+  async get<T>(
+    collectionName: string,
+    docId: string,
+  ): Promise<ReturnGenericObj<T> | null> {
+    const snap = await this.tx.get(documentRef(this.db, collectionName, docId));
+    if (!snap.exists()) {
+      return null;
+    }
+    return { id: snap.id, ...snap.data() } as ReturnGenericObj<T>;
+  }
+
+  set<T>(collectionName: string, docId: string, data: T): this {
+    this.tx.set(
+      documentRef(this.db, collectionName, docId),
+      withTimestamps(data, true),
+    );
+    return this;
+  }
+
+  update<T>(collectionName: string, docId: string, data: Partial<T>): this {
+    this.tx.update(
+      documentRef(this.db, collectionName, docId),
+      withTimestamps(data, false),
+    );
+    return this;
+  }
+
+  delete(collectionName: string, docId: string): this {
+    this.tx.delete(documentRef(this.db, collectionName, docId));
+    return this;
+  }
+}
+
+export class FirestoreWriteBatch {
+  constructor(
+    private readonly batch: WriteBatch,
+    private readonly db: FirebaseFirestore,
+  ) {}
+
+  set<T>(collectionName: string, docId: string, data: T): this {
+    this.batch.set(
+      documentRef(this.db, collectionName, docId),
+      withTimestamps(data, true),
+    );
+    return this;
+  }
+
+  update<T>(collectionName: string, docId: string, data: Partial<T>): this {
+    this.batch.update(
+      documentRef(this.db, collectionName, docId),
+      withTimestamps(data, false),
+    );
+    return this;
+  }
+
+  delete(collectionName: string, docId: string): this {
+    this.batch.delete(documentRef(this.db, collectionName, docId));
+    return this;
+  }
+
+  commit(): Promise<void> {
+    return this.batch.commit();
+  }
+}
 
 export class FirestoreDatabase<TSchema extends Record<string, any> = any> {
   db: FirebaseFirestore;
@@ -43,82 +137,26 @@ export class FirestoreDatabase<TSchema extends Record<string, any> = any> {
   }
 
   /**
-   * Flattens the where conditions into a single object.
-   *
-   * @param conditions - The where conditions to flatten.
-   * @param prefix - The prefix to use for the flattened conditions.
-   *
-   * @returns The flattened conditions.
+   * Underlying Firestore instance (escape hatch for adapters).
    */
-  private flattenWhereConditions<T>(
-    conditions: WhereCondition<T>,
-    prefix = ""
-  ): Record<string, unknown> {
-    return Object.entries(conditions).reduce((acc, [key, value]) => {
-      const newKey = prefix ? `${prefix}.${key}` : key;
-
-      if (typeof value === "object" && value !== null) {
-        if ("operator" in value || "not" in value) {
-          acc[newKey] = value;
-        } else {
-          Object.assign(
-            acc,
-            this.flattenWhereConditions(value as WhereCondition<T>, newKey)
-          );
-        }
-      } else {
-        acc[newKey] = value;
-      }
-
-      return acc;
-    }, {} as Record<string, unknown>);
+  get native(): FirebaseFirestore {
+    return this.db;
   }
 
-  /**
-   * Builds a query based on the provided conditions.
-   *
-   * @param collectionRef - The collection reference to build the query on.
-   * @param options - The options to build the query with.
-   *
-   * @returns The built query.
-   */
   private buildQuery<T>(
-    collectionRef: CollectionReference,
-    options?: GetByCondition<T>
+    collectionName: string,
+    options?: GetByCondition<T>,
   ): Query {
-    let q = query(collectionRef);
+    let q: Query = query(collectionRef(this.db, collectionName));
 
-    if (options?.where) {
-      const flattened = this.flattenWhereConditions(options.where);
-
-      Object.entries(flattened).forEach(([field, condition]) => {
-        if (
-          typeof condition === "object" &&
-          condition !== null &&
-          "operator" in condition
-        ) {
-          const { operator, value } = condition as {
-            operator: WhereFilterOp;
-            value: unknown;
-          };
-          q = query(q, where(field, operator, value));
-        } else if (
-          typeof condition === "object" &&
-          condition !== null &&
-          "not" in condition
-        ) {
-          const { not } = condition as { not: unknown };
-          q = query(q, where(field, "!=", not));
-        } else {
-          q = query(q, where(field, "==", condition));
-        }
-      });
+    for (const clause of whereClauses(options?.where)) {
+      q = query(q, where(clause.field, clause.operator, clause.value));
     }
 
     if (options?.orderBy) {
-      options.orderBy.forEach((order) => {
+      for (const order of options.orderBy) {
         q = query(q, orderBy(order.field as string, order.direction));
-      });
+      }
     }
 
     if (options?.startAfter) {
@@ -133,23 +171,19 @@ export class FirestoreDatabase<TSchema extends Record<string, any> = any> {
   }
 
   /**
-   * Retrieves data from the Firebase Firestore.
-   *
-   * @param collectionName - The name of the collection to retrieve data from.
-   * @param options - The options for retrieving the data.
-   *
-   * @returns The data at the specified path or null if the data does not exist.
+   * Retrieves data from Firestore.
+   * `collectionName` may be a top-level collection or a subcollection path
+   * such as `conversations/{id}/messages`.
    */
   async get<K extends Extract<keyof TSchema, string>, T = TSchema[K]>(
-    collectionName: K,
-    options?: GetById | GetByCondition<T>
+    collectionName: K | string,
+    options?: GetById | GetByCondition<T>,
   ): Promise<ReturnGenericObj<T>[] | null | FirestoreError> {
     try {
-      const collectionRef = collection(this.db, collectionName);
-
-      if (options && options.docId) {
-        const docRef = doc(this.db, collectionName, options.docId as string);
-        const docSnap = await getDoc(docRef);
+      if (options?.docId) {
+        const docSnap = await getDoc(
+          documentRef(this.db, collectionName, options.docId),
+        );
 
         return docSnap.exists()
           ? ([
@@ -161,42 +195,32 @@ export class FirestoreDatabase<TSchema extends Record<string, any> = any> {
           : null;
       }
 
-      const q = this.buildQuery<T>(collectionRef, options as GetByCondition<T>);
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await getDocs(
+        this.buildQuery<T>(collectionName, options as GetByCondition<T>),
+      );
 
       return querySnapshot.empty
         ? []
-        : (querySnapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
+        : (querySnapshot.docs.map((snapshot) => ({
+            id: snapshot.id,
+            ...snapshot.data(),
           })) as ReturnGenericObj<T>[]);
     } catch (error) {
       return { error };
     }
   }
 
-  /**
-   * Subscribes to data from the Firebase Firestore.
-   *
-   * @param collectionName - The name of the collection to subscribe to.
-   * @param callback - The callback to run when the data changes.
-   * @param options - The options for subscribing to the data.
-   * @param errorCallback - The callback to run when an error occurs.
-   *
-   * @returns A function to unsubscribe from the data.
-   */
   subscribe<K extends Extract<keyof TSchema, string>, T = TSchema[K]>(
-    collectionName: K,
-    callback: (data: ReturnGenericObj<T>[] | ReturnGenericObj<T> | null) => void,
+    collectionName: K | string,
+    callback: (
+      data: ReturnGenericObj<T>[] | ReturnGenericObj<T> | null,
+    ) => void,
     options?: GetById | GetByCondition<T>,
-    errorCallback?: (error: unknown) => void
+    errorCallback?: (error: unknown) => void,
   ): () => void {
-    const collectionRef = collection(this.db, collectionName);
-
-    if (options && options.docId) {
-      const docRef = doc(this.db, collectionName, options.docId as string);
+    if (options?.docId) {
       return onSnapshot(
-        docRef,
+        documentRef(this.db, collectionName, options.docId),
         (docSnap) => {
           if (docSnap.exists()) {
             callback({
@@ -207,136 +231,186 @@ export class FirestoreDatabase<TSchema extends Record<string, any> = any> {
             callback(null);
           }
         },
-        errorCallback
+        errorCallback,
       );
     }
 
-    const q = this.buildQuery<T>(collectionRef, options as GetByCondition<T>);
     return onSnapshot(
-      q,
+      this.buildQuery<T>(collectionName, options as GetByCondition<T>),
       (querySnapshot) => {
-        const data = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as ReturnGenericObj<T>[];
-        callback(data);
+        callback(
+          querySnapshot.docs.map((snapshot) => ({
+            id: snapshot.id,
+            ...snapshot.data(),
+          })) as ReturnGenericObj<T>[],
+        );
       },
-      errorCallback
+      errorCallback,
     );
   }
 
-  /**
-   * Adds data to the Firebase Firestore.
-   *
-   * @param collectionName - The name of the collection to add data to.
-   * @param data - The data to add to the collection.
-   * @param id - The ID of the document to add the data to.
-   *
-   * @returns The data that was added to the collection or an error object if the operation fails.
-   */
   async add<K extends Extract<keyof TSchema, string>, T = TSchema[K]>(
-    collectionName: K,
+    collectionName: K | string,
     data: T,
-    docId?: string
+    docId?: string,
   ): Promise<ReturnGenericObj<T> | FirestoreError> {
     try {
+      const col = collectionRef(this.db, collectionName);
       const docRef = docId
-        ? doc(this.db, collectionName, docId)
-        : doc(collection(this.db, collectionName));
+        ? documentRef(this.db, collectionName, docId)
+        : doc(col);
+      const object = withTimestamps(data, true);
 
-      const timestamp = new Date().toISOString();
-      const object =
-        typeof data === "object" && data !== null
-          ? data
-          : ({ [collectionName]: data } as unknown as T);
-
-      await setDoc(docRef, {
-        ...object,
-        created_at: timestamp,
-        updated_at: timestamp,
-      });
+      await setDoc(docRef, object);
       return { id: docRef.id, ...object } as ReturnGenericObj<T>;
     } catch (error) {
       return { error };
     }
   }
 
-  /**
-   * Updates data in the Firebase Firestore (Overwrite).
-   *
-   * @param collectionName - The name of the collection to update data in.
-   * @param doc_id - The ID of the document to update.
-   * @param data - The data to update in the document.
-   *
-   * @returns An error object if the operation fails.
-   */
   async set<K extends Extract<keyof TSchema, string>, T = TSchema[K]>(
-    collectionName: K,
+    collectionName: K | string,
     docId: string,
-    data: T
-  ): Promise<void | FirestoreError> {
+    data: T,
+  ): Promise<undefined | FirestoreError> {
     try {
-      const timestamp = new Date().toISOString();
-      const object =
-        typeof data === "object" && data !== null
-          ? data
-          : ({ [collectionName]: data } as unknown as T);
-
-      await setDoc(doc(this.db, collectionName, docId), {
-        ...object,
-        updated_at: timestamp,
-      });
+      await setDoc(
+        documentRef(this.db, collectionName, docId),
+        withTimestamps(data, false),
+      );
     } catch (error) {
       return { error };
     }
   }
 
-  /**
-   * Updates data in the Firebase Firestore (Merge).
-   *
-   * @param collection - The name of the collection to update data in.
-   * @param docId - The ID of the document to update.
-   * @param data - The data to update in the document.
-   *
-   * @returns An error object if the operation fails.
-   */
   async update<K extends Extract<keyof TSchema, string>, T = TSchema[K]>(
-    collectionName: K,
+    collectionName: K | string,
     docId: string,
-    data: Partial<T>
-  ): Promise<void | FirestoreError> {
+    data: Partial<T>,
+  ): Promise<undefined | FirestoreError> {
     try {
-      const timestamp = new Date().toISOString();
-      const object =
-        typeof data === "object" && data !== null
-          ? data
-          : ({ [collectionName]: data } as unknown as Partial<T>);
+      await updateDoc(
+        documentRef(this.db, collectionName, docId),
+        withTimestamps(data, false),
+      );
+    } catch (error) {
+      return { error };
+    }
+  }
 
-      await updateDoc(doc(this.db, collectionName, docId), {
-        ...object,
-        updated_at: timestamp,
-      });
+  async delete<K extends Extract<keyof TSchema, string>>(
+    collectionName: K | string,
+    docId: string,
+  ): Promise<undefined | FirestoreError> {
+    try {
+      await deleteDoc(documentRef(this.db, collectionName, docId));
     } catch (error) {
       return { error };
     }
   }
 
   /**
-   * Deletes data from the Firebase Firestore.
+   * Query across **all subcollections** with the same name using Firestore's
+   * `collectionGroup` feature.
    *
-   * @param collectionName - The name of the collection to delete data from.
-   * @param docId - The ID of the document to delete.
-   *
-   * @returns An error object if the operation fails.
+   * @example
+   * // Get all 'messages' documents across every conversation
+   * const msgs = await db.firestore.getGroup('messages', {
+   *   orderBy: [{ field: 'created_at', direction: 'desc' }],
+   *   limit: 50,
+   * });
    */
-  async delete<K extends Extract<keyof TSchema, string>>(
-    collectionName: K,
-    docId: string
-  ): Promise<void | FirestoreError> {
+  async getGroup<T = any>(
+    collectionId: string,
+    options?: GetByCondition<T>,
+  ): Promise<ReturnGenericObj<T>[] | FirestoreError> {
     try {
-      await deleteDoc(doc(this.db, collectionName, docId));
+      let q: Query = collectionGroup(this.db, collectionId);
+
+      for (const clause of whereClauses(options?.where)) {
+        q = query(q, where(clause.field, clause.operator, clause.value));
+      }
+      if (options?.orderBy) {
+        for (const order of options.orderBy) {
+          q = query(q, orderBy(order.field as string, order.direction));
+        }
+      }
+      if (options?.startAfter) {
+        q = query(q, startAfter(options.startAfter));
+      }
+      if (options?.limit) {
+        q = query(q, limit(options.limit));
+      }
+
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map((snapshot) => ({
+        id: snapshot.id,
+        ...snapshot.data(),
+      })) as ReturnGenericObj<T>[];
     } catch (error) {
       return { error };
     }
+  }
+
+  /**
+   * Count documents in a collection matching optional filters.
+   * Uses Firestore's server-side `count()` aggregation — does not read document data.
+   *
+   * @example
+   * const total = await db.firestore.count('users');
+   * const activeCount = await db.firestore.count('users', { where: { active: true } });
+   */
+  async count<T = any>(
+    collectionName: string,
+    options?: GetByCondition<T>,
+  ): Promise<number | FirestoreError> {
+    try {
+      const q = this.buildQuery<T>(collectionName, options);
+      const snapshot = await getAggregateFromServer(q, { count: count() });
+      return snapshot.data().count;
+    } catch (error) {
+      return { error };
+    }
+  }
+
+  /**
+   * Run server-side aggregate queries (`sum`, `average`) on a collection.
+   * Does not read full document data, making it very efficient.
+   *
+   * @example
+   * const stats = await db.firestore.aggregate('orders', { sum: 'total', average: 'total' });
+   * console.log(stats.sum, stats.average);
+   */
+  async aggregate<T = any>(
+    collectionName: string,
+    fields: { sum?: keyof T & string; average?: keyof T & string },
+    options?: GetByCondition<T>,
+  ): Promise<{ sum?: number | null; average?: number | null } | FirestoreError> {
+    try {
+      const q = this.buildQuery<T>(collectionName, options);
+      const spec: AggregateSpec = {};
+      if (fields.sum) spec.sum = sum(fields.sum);
+      if (fields.average) spec.average = average(fields.average);
+      const snapshot = await getAggregateFromServer(q, spec);
+      const data = snapshot.data();
+      return {
+        sum: fields.sum ? (data.sum as number | null) : undefined,
+        average: fields.average ? (data.average as number | null) : undefined,
+      };
+    } catch (error) {
+      return { error };
+    }
+  }
+
+  async runTransaction<T>(
+    fn: (tx: FirestoreTransaction) => Promise<T>,
+  ): Promise<T> {
+    return runTransaction(this.db, async (raw) =>
+      fn(new FirestoreTransaction(raw, this.db)),
+    );
+  }
+
+  batch(): FirestoreWriteBatch {
+    return new FirestoreWriteBatch(writeBatch(this.db), this.db);
   }
 }

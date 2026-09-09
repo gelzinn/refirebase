@@ -80,7 +80,7 @@ const { db, auth } = new Refirebase({
 });
 ```
 
-If you prefer to use directly environment variables (from `.env` file), you can simply call the constructor without any parameters:
+If you prefer to use environment variables, you can call the constructor without any parameters. In Next.js, `NEXT_PUBLIC_FIREBASE_*` is also accepted (the client bundle cannot read unprefixed `FIREBASE_*` keys).
 
 ```yaml
 FIREBASE_API_KEY=
@@ -91,6 +91,15 @@ FIREBASE_STORAGE_BUCKET=
 FIREBASE_MESSAGING_SENDER_ID=
 FIREBASE_APP_ID=
 FIREBASE_MEASUREMENT_ID=
+
+# Next.js public aliases (optional)
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+NEXT_PUBLIC_FIREBASE_DATABASE_URL=
 ```
 
 ```javascript
@@ -131,6 +140,27 @@ const users = db.firestore.get("users", {
     age: { operator: ">=", value: 18 },
   },
 });
+
+// Subcollections (odd number of path segments)
+const messages = db.firestore.get("conversations/abc/messages", {
+  orderBy: [{ field: "created_at", direction: "desc" }],
+  limit: 50,
+});
+
+// Live updates
+const unsubscribe = db.firestore.subscribe("users", (docs) => {
+  console.log(docs);
+});
+
+// Transactions and batches
+await db.firestore.runTransaction(async (tx) => {
+  const current = await tx.get("meta", "storageQuota");
+  tx.update("meta", "storageQuota", { usedBytes: current.usedBytes + 1024 });
+});
+
+const batch = db.firestore.batch();
+batch.set("inbox/uid/chats", "abc", { previewKind: "text" });
+await batch.commit();
 ```
 
 > [!WARNING]  
@@ -139,21 +169,32 @@ const users = db.firestore.get("users", {
 #### Realtime Database Example
 
 ```javascript
-// Import the Refirebase class
 import { db } from '@/config/firebase';
 
-// Get ALL data from the 'users' collection
-const users = db.realtime.get("users");
+const users = await db.realtime.get("users");
+
+const stop = await db.realtime.onValue("inbox/uid", (value) => {
+  console.log(value);
+});
+
+await db.realtime.onDisconnect("presence/uid").remove();
 ```
 
 #### Storage
 
 ```javascript
-// Import the Refirebase class
 import { db } from '@/config/firebase';
 
-// Get a file from the storage
-const file = db.storage.get("path/to/file");
+// Default: path + size only (no long-lived download URL)
+const uploaded = await db.storage.upload("media/photo.jpg", file);
+
+// Legacy public URL
+const publicFile = await db.storage.upload("public/photo.jpg", file, {
+  downloadUrl: true,
+});
+
+const bytes = await db.storage.getBytes("media/photo.jpg");
+const url = await db.storage.getUrl("public/photo.jpg");
 ```
 
 ### Features
@@ -161,18 +202,45 @@ const file = db.storage.get("path/to/file");
 #### Authentication Example
 
 ```javascript
-// Import the Refirebase class
 import { auth } from '@/config/firebase';
 
-// Sign in with Google
-const result = await auth.handleProviderSignIn("google");
+const google = await auth.handleProviderSignIn("google");
+const email = await auth.handleEmailSignIn("user@email.com", "password");
+const custom = await auth.handleCustomTokenSignIn(serverMintedToken);
 
-if (!result) {
-  // Handle error
-}
-
-const user = result.user;
+await auth.handleSignOut();
 ```
+
+#### React
+
+```javascript
+import { RefirebaseProvider, useCollection, useUser, useValue } from 'refirebase/react';
+```
+
+#### Admin SDK (server only)
+
+```javascript
+import { RefirebaseAdmin } from 'refirebase/admin';
+
+const admin = new RefirebaseAdmin({
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  databaseURL: process.env.FIREBASE_DATABASE_URL,
+});
+
+const token = await admin.auth.createCustomToken(userId);
+await admin.db.storage.upload("media/photo.jpg", buffer);
+const signed = await admin.db.storage.getSignedUrl("media/photo.jpg", {
+  expiresSeconds: 60,
+});
+
+// Escape hatch for adapters (e.g. Better Auth Firestore adapter)
+const nativeFirestore = admin.db.firestore.native;
+```
+
+`firebase-admin` is an optional peer dependency of `refirebase/admin`.
 
 ## License
 

@@ -10,7 +10,8 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "format": "turbo format",
-    "format:apply": "turbo format:apply"
+    "format:apply": "turbo format:apply",
+    "test": "bun test packages/refirebase"
   },
   "devDependencies": {
     "@biomejs/biome": "1.8.3",

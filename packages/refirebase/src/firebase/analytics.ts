@@ -1,4 +1,4 @@
-import type { FirebaseApp } from "firebase/app";
+import type { FirebaseApp } from 'firebase/app';
 
 import {
   type Analytics,
@@ -8,9 +8,9 @@ import {
   setAnalyticsCollectionEnabled,
   setUserId,
   setUserProperties,
-} from "firebase/analytics";
+} from 'firebase/analytics';
 
-import { MESSAGES } from "../config/messages";
+import { MESSAGES } from '../config/messages';
 
 export class FirebaseAnalytics {
   private readonly analytics: Analytics | null;
@@ -23,7 +23,7 @@ export class FirebaseAnalytics {
     /**
      * Prevent analytics from being initialized in a non-browser environment.
      */
-    if (typeof window !== "undefined") {
+    if (typeof window !== 'undefined' && app.options.measurementId) {
       this.analytics = getAnalytics(app);
     } else {
       this.analytics = null;
@@ -40,7 +40,7 @@ export class FirebaseAnalytics {
   log(
     eventName: string,
     eventParams?: { [key: string]: any },
-    options?: AnalyticsCallOptions
+    options?: AnalyticsCallOptions,
   ): void {
     if (!eventName) {
       throw new Error(MESSAGES.ANALYTICS.EVENT_NAME_REQUIRED);
@@ -90,7 +90,7 @@ export class FirebaseAnalytics {
    */
   updateUserProperties(
     properties: { [key: string]: any },
-    options?: AnalyticsCallOptions
+    options?: AnalyticsCallOptions,
   ): void {
     if (!properties || Object.keys(properties).length === 0) {
       throw new Error(MESSAGES.ANALYTICS.USER_PROPERTIES_REQUIRED);

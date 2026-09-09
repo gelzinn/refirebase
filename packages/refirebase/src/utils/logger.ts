@@ -1,4 +1,4 @@
-const PREFIX = "🔥 [Refirebase]";
+const PREFIX = '🔥 [Refirebase]';
 
 /**
  * Logger utility for Refirebase
@@ -15,8 +15,8 @@ export const logger = {
   },
   debug: (message: string, ...args: any[]) => {
     if (
-      typeof process !== "undefined" &&
-      (process.env.NODE_ENV === "development" || process.env.DEBUG === "true")
+      typeof process !== 'undefined' &&
+      (process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true')
     ) {
       console.debug(`${PREFIX} ${message}`, ...args);
     }

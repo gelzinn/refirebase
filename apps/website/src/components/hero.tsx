@@ -1,78 +1,61 @@
-"use client";
+import { HighlightedCodeBlock } from "@/components/code-highlight";
+import { InstallTabs } from "@/components/install-tabs";
+import { LIB_NAME } from "@/lib/env";
 
-import { motion } from "framer-motion";
-import { ArrowRight, Code, Sparkles } from "lucide-react";
-import Link from "next/link";
+const COMMANDS = {
+  bun: `bun add ${LIB_NAME}`,
+  npm: `npm install ${LIB_NAME}`,
+  pnpm: `pnpm add ${LIB_NAME}`,
+  yarn: `yarn add ${LIB_NAME}`,
+} as const;
 
-export function Hero() {
-  const codeSnippet = `const { db } = new Refirebase();
-
-// No more boilerplate
-const users = await db.firestore.get("users", {
-  where: { role: "admin" }
-});`;
-
+export async function Hero() {
   return (
-    <section className="relative pt-32 pb-20 overflow-hidden">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[600px] hero-gradient pointer-events-none" />
-      
-      <div className="container mx-auto px-6 text-center relative z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-orange-500/20 bg-orange-500/5 text-primary text-xs font-medium mb-6">
-            <Sparkles className="w-3 h-3" />
-            <span>Introducing Refirebase 0.1.24</span>
-          </div>
-          
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 bg-gradient-to-b from-white to-white/70 bg-clip-text text-transparent">
-            Firebase development, <br />
-            <span className="text-primary italic">simplified.</span>
-          </h1>
-          
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed font-light">
-            O jeito mais fácil de gerenciar Firestore, Auth e Storage. Sem boilerplate, apenas código limpo e intuitivo.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20">
-            <Link 
-              href="#get-started" 
-              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
-            >
-              Começar agora <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link 
-              href="https://github.com/refirebase/refirebase" 
-              className="w-full sm:w-auto px-8 py-4 rounded-xl glass font-semibold flex items-center justify-center gap-2 hover:bg-white/10 transition-colors"
-            >
-              <Code className="w-4 h-4" /> Ver no GitHub
-            </Link>
-          </div>
-        </motion.div>
+    <section className="flex flex-col gap-8">
+      <h1 className="font-heading max-w-2xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl motion-safe:animate-fade-up">
+        The easiest Firebase API
+      </h1>
+      <p className="max-w-xl text-pretty text-lg text-muted-foreground motion-safe:animate-fade-up [animation-delay:100ms]">
+        One class for Firestore, Realtime Database, Storage, and Auth. Client
+        hooks, Admin SDK, and Next.js env vars — without the boilerplate.
+      </p>
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.7, delay: 0.2 }}
-          className="max-w-3xl mx-auto rounded-2xl border border-white/10 glass p-1 shadow-2xl shadow-black/50 overflow-hidden bg-black/40"
-        >
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5 bg-white/5">
-            <div className="flex gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-red-500/50" />
-              <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
-              <div className="w-3 h-3 rounded-full bg-green-500/50" />
-            </div>
-            <span className="text-[10px] text-muted-foreground ml-auto font-mono">example.ts</span>
-          </div>
-          <pre className="p-6 text-left text-sm md:text-base font-mono overflow-x-auto">
-            <code className="text-orange-400">
-              {codeSnippet}
-            </code>
-          </pre>
-        </motion.div>
-      </div>
+      <InstallTabs
+        panes={{
+          bun: (
+            <HighlightedCodeBlock
+              code={COMMANDS.bun}
+              lang="bash"
+              label="bun"
+              className="w-full"
+            />
+          ),
+          npm: (
+            <HighlightedCodeBlock
+              code={COMMANDS.npm}
+              lang="bash"
+              label="npm"
+              className="w-full"
+            />
+          ),
+          pnpm: (
+            <HighlightedCodeBlock
+              code={COMMANDS.pnpm}
+              lang="bash"
+              label="pnpm"
+              className="w-full"
+            />
+          ),
+          yarn: (
+            <HighlightedCodeBlock
+              code={COMMANDS.yarn}
+              lang="bash"
+              label="yarn"
+              className="w-full"
+            />
+          ),
+        }}
+      />
     </section>
   );
 }

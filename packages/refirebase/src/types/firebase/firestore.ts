@@ -1,18 +1,24 @@
-import { 
+import type {
+  OrderByDirection,
   WhereFilterOp as WhereFilterOperator,
-  OrderByDirection
-} from "firebase/firestore";
+} from 'firebase/firestore';
 
 export type ReturnGenericObj<T> = T & { id: string };
 
-export type GetById = { docId: string; where?: never; orderBy?: never; limit?: never; startAfter?: never };
+export type GetById = {
+  docId: string;
+  where?: never;
+  orderBy?: never;
+  limit?: never;
+  startAfter?: never;
+};
 
-export type GetByCondition<T> = { 
-  docId?: never; 
+export type GetByCondition<T> = {
+  docId?: never;
   where?: WhereCondition<T>;
-  orderBy?: { 
-    field: keyof T | string; 
-    direction?: OrderByDirection 
+  orderBy?: {
+    field: keyof T | string;
+    direction?: OrderByDirection;
   }[];
   limit?: number;
   startAfter?: any;

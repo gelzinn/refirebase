@@ -1,9 +1,23 @@
-import type { FirebaseConfig } from "../types/firebase/config";
+import type { FirebaseConfig } from '../types/firebase/config';
 
-import { type FirebaseApp, deleteApp, initializeApp } from "firebase/app";
-import { FirebaseError } from "firebase/app";
+import {
+  type FirebaseApp,
+  deleteApp,
+  getApps,
+  initializeApp,
+} from 'firebase/app';
+import { FirebaseError } from 'firebase/app';
 
 let app: FirebaseApp | null = null;
+
+function matchingApp(config: FirebaseConfig): FirebaseApp | undefined {
+  return getApps().find(
+    (existing) =>
+      existing.options.apiKey === config.apiKey &&
+      existing.options.appId === config.appId &&
+      existing.options.projectId === config.projectId,
+  );
+}
 
 /**
  * Initializes the Firebase app with the given configuration.
@@ -13,10 +27,16 @@ let app: FirebaseApp | null = null;
  * @returns The initialized Firebase app.
  */
 function init(config: FirebaseConfig) {
-  if (app) return app;
+  const existing = matchingApp(config);
+  if (existing) {
+    app = existing;
+    return existing;
+  }
 
   try {
-    app = initializeApp(config);
+    const name =
+      getApps().length === 0 ? undefined : `refirebase-${config.appId}`;
+    app = name ? initializeApp(config, name) : initializeApp(config);
   } catch (error) {
     if (error instanceof FirebaseError) {
       throw new Error(`x Firebase initialization error: ${error.message}`);
